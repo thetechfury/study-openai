@@ -1,11 +1,14 @@
 import streamlit as st
 from dotenv import load_dotenv
+from pymongo import MongoClient
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import TextLoader, CSVLoader
 import os
 import openai
+import numpy as np
+from bson.binary import Binary
+import pickle
 
 
 def main():
@@ -15,15 +18,40 @@ def main():
     # Set OpenAI API key
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
+    # Connect to MongoDB
+    client = MongoClient(os.getenv("MONGODB_URI"))
+    db = client["vector_db"]
+    collection = db["embeddings"]
+
     st.header("Chatbot with Custom Data 💬")
 
     # Load and split documents
-    raw_documents = TextLoader('./short-stories.txt', encoding='UTF-8').load()
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-    documents = text_splitter.split_documents(raw_documents)
+    # try:
+    #     raw_documents = TextLoader('mini_habits.txt', encoding='UTF-8').load()
+    # except Exception as e:
+    #     st.error(f"Error loading file: {e}")
+    #     return
+    #
+    # text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    documents = CSVLoader('Contact Information J.csv', encoding='UTF-8').load()
 
-    # Create FAISS index
-    db = FAISS.from_documents(documents, OpenAIEmbeddings())
+    # Create OpenAI embeddings
+    embeddings = OpenAIEmbeddings()
+
+    # Store documents and embeddings in MongoDB
+    for doc in documents:
+        # Check if the document content already exists in the database
+        existing_doc = collection.find_one({"content": doc.page_content})
+        if existing_doc:
+            continue
+
+        # Compute the embedding for the document
+        embedding_vector = embeddings.embed_query(doc.page_content)
+        doc_dict = {
+            "content": doc.page_content,
+            "embedding": Binary(pickle.dumps(embedding_vector, protocol=2))
+        }
+        collection.insert_one(doc_dict)
 
     # Initialize session state for conversation history
     if 'messages' not in st.session_state:
@@ -32,27 +60,45 @@ def main():
     # Display previous messages
     for i, message in enumerate(st.session_state.messages):
         if message['role'] == 'user':
-            st.text_area("You:", value=message['content'], height=50, max_chars=None, key=f"user_{i}")
-        else:
-            st.text_area("Bot:", value=message['content'], height=50, max_chars=None, key=f"bot_{i}")
+            st.text_area("You:", value=message['content'], height=5, max_chars=None, key=f"user_{i}")
+        elif message['role'] == 'assistant':
+            st.text_area("Bot:", value=message['content'], height=250, max_chars=None, key=f"bot_{i}")
 
     # User input
     query = st.text_input("You:")
+
     if query:
-        # Add user message to session state
+        # Define system instructions
+        instructions = """
+                You are a helpful assistant. Use the provided context to answer the user's questions accurately.
+                Provide concise and clear responses. If the context does not contain the answer, let the user know.
+                If there is any word like 'moye' is founded show this 'm***' instead. If timespan is provided like this 
+                'June 4, 2024, at 11:08:27 AM GMT+5' only show this 'June 4, 2024, at 11:08:27 AM' remove last 'GMT' 
+                part.
+                """
+
+        # Add user message and system instructions to session state
         st.session_state.messages.append({'role': 'user', 'content': query})
+        st.session_state.messages.append({"role": "system", "content": instructions})
 
         # Embed the user query
-        embedding_vector = OpenAIEmbeddings().embed_query(query)
+        query_embedding = embeddings.embed_query(query)
 
-        # Perform similarity search on the FAISS index
-        docs = db.similarity_search_by_vector(embedding_vector)
+        # Retrieve stored embeddings from MongoDB
+        stored_docs = list(collection.find())
 
-        # Extract content from the most relevant document
-        if docs:
-            related_content = docs[0].page_content
-        else:
-            related_content = "No relevant documents found."
+        # Calculate similarity with stored embeddings
+        def cosine_similarity(vec1, vec2):
+            return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+
+        similarities = [
+            (doc, cosine_similarity(query_embedding, pickle.loads(doc["embedding"])))
+            for doc in stored_docs
+        ]
+
+        # Find the most similar document
+        most_similar_doc = max(similarities, key=lambda x: x[1])[0]
+        related_content = most_similar_doc["content"]
 
         # Combine related content with the user query for context
         combined_input = f"User: {query}\n\nContext from data: {related_content}"
@@ -61,7 +107,7 @@ def main():
         response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": instructions},
                 {"role": "user", "content": combined_input}
             ]
         )
@@ -70,7 +116,7 @@ def main():
         st.session_state.messages.append({'role': 'assistant', 'content': bot_response})
 
         # Display bot response
-        st.text_area("Bot:", value=bot_response, height=50, max_chars=None,
+        st.text_area("Bot:", value=bot_response, height=250, max_chars=None,
                      key=f"response_{len(st.session_state.messages)}")
 
 
