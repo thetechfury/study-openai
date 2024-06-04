@@ -96,9 +96,10 @@ def main():
             for doc in stored_docs
         ]
 
-        # Find the most similar document
-        most_similar_doc = max(similarities, key=lambda x: x[1])[0]
-        related_content = most_similar_doc["content"]
+        similarities.sort(key=lambda x: x[1], reverse=True)
+
+        # Combine content from the top N documents for context
+        related_content = "\n\n".join([doc[0]["content"] for doc in similarities])
 
         # Combine related content with the user query for context
         combined_input = f"User: {query}\n\nContext from data: {related_content}"
