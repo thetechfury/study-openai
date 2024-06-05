@@ -33,7 +33,7 @@ def main():
     #     return
     #
     # text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-    documents = CSVLoader('Contact Information J.csv', encoding='UTF-8').load()
+    documents = CSVLoader('Freelance - 実態調査 (LC).csv', encoding='UTF-8').load()
 
     # Create OpenAI embeddings
     embeddings = OpenAIEmbeddings()
@@ -74,7 +74,8 @@ def main():
                 Provide concise and clear responses. If the context does not contain the answer, let the user know.
                 If there is any word like 'moye' is founded show this 'm***' instead. If timespan is provided like this 
                 'June 4, 2024, at 11:08:27 AM GMT+5' only show this 'June 4, 2024, at 11:08:27 AM' remove last 'GMT' 
-                part.
+                part. Answer the user's questions accurately in the same language they are asked.
+                If the context does not contain the answer, let the user know.
                 """
 
         # Add user message and system instructions to session state
@@ -99,19 +100,20 @@ def main():
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         # Combine content from the top N documents for context
-        related_content = "\n\n".join([doc[0]["content"] for doc in similarities])
+        related_content = "\n\n".join([doc[0]["content"] for doc in similarities[:6]])
 
         # Combine related content with the user query for context
         combined_input = f"User: {query}\n\nContext from data: {related_content}"
 
         # Call OpenAI API to get response
         response = openai.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": instructions},
                 {"role": "user", "content": combined_input}
             ]
         )
+
         # Add bot response to session state
         bot_response = response.choices[0].message.content
         st.session_state.messages.append({'role': 'assistant', 'content': bot_response})
