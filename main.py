@@ -1,5 +1,6 @@
 import streamlit as st
 from dotenv import load_dotenv
+from langdetect import detect
 from pymongo import MongoClient
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
@@ -68,6 +69,7 @@ def main():
     query = st.text_input("You:")
 
     if query:
+        query_language = detect(query)
         # Define system instructions
         instructions = """
                 You are a helpful assistant. Use the provided context to answer the user's questions accurately.
