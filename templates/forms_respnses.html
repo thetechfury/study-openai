@@ -1,0 +1,50 @@
+{% if responses %}
+    {#    <p class="d-flex justify-content-end me-3"><strong class="me-1">Number of Responses = </strong> {{ responses|length }}</p>#}
+    {#    <ol class="list-group list-group-numbered m-3">#}
+    {#        {% for resp in responses %}#}
+    {#            <li class="list-group-item d-flex justify-content-between align-items-start">#}
+    {#                <div class="ms-2 me-auto">#}
+    {#                    <div class="fw-bold g-form-resp-id mb-3">Response ID: {{ resp.response_id }}</div>#}
+    {#                    {% for question in resp.answers %}#}
+    {#                        <li>#}
+    {#                            <p class="d-flex">#}
+    {#                                <strong class="me-1" data-question-id="{{ question.question_id }}">Question:</strong> {{ question.title }}<br>#}
+    {#                                {% if question.image %}#}
+    {#                                    <a class="ms-1" href="{{ question.image }}" target="_blank" rel="external">click to view#}
+    {#                                        image</a>#}
+    {#                                {% endif %}#}
+    {#                            </p>#}
+    {#                            <p>#}
+    {#                                {% for ans in question.value %}#}
+    {#                                    <strong>Answer:</strong> {{ ans.value }}#}
+    {#                                    {% if 'fileId' in ans %}#}
+    {#                                        <a href="https://drive.google.com/file/d/{{ ans.fileId }}/view" target="_blank"#}
+    {#                                           rel="external">Click here to#}
+    {#                                            see#}
+    {#                                            image</a>#}
+    {#                                    {% endif %}#}
+    {#                                {% endfor %}#}
+    {#                            </p>#}
+    {##}
+    {#                        </li>#}
+    {#                    {% endfor %}#}
+    {#                </div>#}
+    {#            </li>#}
+    {#        {% endfor %}#}
+    {#    </ol>#}
+
+    <div class="chat-container mb-4">
+        <div class="chat-header">
+            Chatbot
+        </div>
+        <div class="chat-messages" id="bot-resp">
+            <!-- Chat messages will be appended here -->
+        </div>
+        <div class="chat-input">
+            <input type="text" class="w-25 mx-auto" placeholder="Enter your query here..." id="query-input"
+                   data-url="{% url 'get-form-responses' form_id %}">
+        </div>
+    </div>
+{% else %}
+    <p>No Response</p>
+{% endif %}
