@@ -9,21 +9,18 @@ from bson import Binary
 from django.contrib.auth import logout
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from django.utils.decorators import method_decorator
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from langchain_community.document_loaders import CSVLoader, JSONLoader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_core.documents import Document
 from langdetect import detect
 from pymongo import MongoClient
 from study_openai import settings
-from study_openai.settings import MEDIA_ROOT
+from study_openai.settings import MEDIA_ROOT, STATICFILES_DIRS
 
 
 class RedirectToUrlView(View):
@@ -145,16 +142,11 @@ class GetGoogleFormsResponses(View):
             collection = db[form_id]
 
             query_language = detect(query)
-            # Define system instructions
-            instructions = f"""
-                    You are a helpful assistant. Use the provided context to answer the user's questions accurately.
-                    Provide concise and clear responses. If the context does not contain the answer, let the user know.
-                    If there is any word like 'moye' is founded show this 'm***' instead. If timespan is provided like this
-                    'June 4, 2024, at 11:08:27 AM GMT+5' only show this 'June 4, 2024, at 11:08:27 AM' remove last 'GMT'
-                    part. Answer the user's questions accurately in the same language they are asked. Use this as your reference
-                     {query_language}.
-                    If the context does not contain the answer, let the user know.
-                    """
+
+            # Read instructions from file
+            instruction_file_path = os.path.join(STATICFILES_DIRS[0], 'instructions_file/openai_instructions.txt')
+            with open(instruction_file_path, 'r') as file:
+                instructions = file.read().format(query_language=query_language)
 
             # Embed the user query
             query_embedding = embeddings.embed_query(query)
@@ -289,10 +281,18 @@ class GetGoogleFormsResponses(View):
         result_strings = []
         for item in data:
             title = item['title']
-            if title is None:
-                continue
-            value = item['value'][0]['value']
-            result_strings.append(f"{title}: {value}")
+            value = item['value'][0].get('value', None)
+            # image = item['value'][0].get('image', None)
+
+            if not value:
+                file_id = item['value'][0]['fileId']
+                file_name = item['value'][0]['fileId']
+                file_type = item['value'][0]['fileId']
+                result_strings.append(f"{file_type}: {file_name} has file_id {file_id}")
+            # elif image:
+            #     result_strings.append(f"{title}: {image}")
+            else:
+                result_strings.append(f"{title}: {value}")
         final_string = "\n".join(result_strings)
         return final_string
 

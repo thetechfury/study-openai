@@ -33,10 +33,12 @@ $(document).ready(function () {
                     input_box.append(loader)
                 },
                 success: function (resp) {
+                    var responses_html = `<div class="px-2 py-1 my-3 scrollbar-2 w-75 chat-question border border-success">${input_value}</div>
+                                <div class="px-2 py-1 border chat-answer scrollbar-2 border-info">${resp.bot_response}</div>`
                     input_box.find('.dots-loader').hide()
                     input.show()
                     input.val('')
-                    $(document).find('#bot-resp').html(resp.bot_response)
+                    $(document).find('#bot-resp').append(responses_html)
                 }
             })
         }

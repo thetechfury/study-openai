@@ -104,10 +104,34 @@ body {
 }
 
 .logout-button {
-    position: fixed;
+    position: sticky;
     bottom: 0;
     left: 50%;
     transform: translate(-50%, -50%);
+}
+
+.scrollbar-2::-webkit-scrollbar {
+    width: 2px;
+}
+
+.scrollbar-2::-webkit-scrollbar-track {
+    box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.scrollbar-2::-webkit-scrollbar-thumb {
+    background-color: #707070;
+    outline: 1px solid #FFFFFF;
+    border-radius: 3px;
+}
+
+.chat-question {
+    height: 40px;
+    overflow-y: auto;
+}
+
+.chat-answer {
+    height: 100px;
+    overflow-y: auto;
 }
 
 @keyframes l1 {
