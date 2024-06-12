@@ -34,7 +34,7 @@ def main():
     #     return
     #
     # text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-    documents = CSVLoader('Freelance - 実態調査 (LC).csv', encoding='UTF-8').load()
+    documents = CSVLoader('Freelance - 実態調査 (LC) - Sheet1.csv', encoding='iso-8859-1').load()
 
     # Create OpenAI embeddings
     embeddings = OpenAIEmbeddings()
@@ -70,15 +70,12 @@ def main():
 
     if query:
         query_language = detect(query)
-        # Define system instructions
-        instructions = """
-                You are a helpful assistant. Use the provided context to answer the user's questions accurately.
-                Provide concise and clear responses. If the context does not contain the answer, let the user know.
-                If there is any word like 'moye' is founded show this 'm***' instead. If timespan is provided like this 
-                'June 4, 2024, at 11:08:27 AM GMT+5' only show this 'June 4, 2024, at 11:08:27 AM' remove last 'GMT' 
-                part. Answer the user's questions accurately in the same language they are asked.
-                If the context does not contain the answer, let the user know.
-                """
+
+        # Read instructions from file
+        with open('openai_instructions.txt', 'r') as file:
+            instructions = file.read().format(query_language=query_language)
+
+        st.write(instructions)
 
         # Add user message and system instructions to session state
         st.session_state.messages.append({'role': 'user', 'content': query})
@@ -102,7 +99,7 @@ def main():
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         # Combine content from the top N documents for context
-        related_content = "\n\n".join([doc[0]["content"] for doc in similarities[:6]])
+        related_content = "\n\n".join([doc[0]["content"] for doc in similarities[:25]])
 
         # Combine related content with the user query for context
         combined_input = f"User: {query}\n\nContext from data: {related_content}"
