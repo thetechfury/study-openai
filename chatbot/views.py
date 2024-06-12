@@ -186,50 +186,77 @@ class GetGoogleFormsResponses(View):
 
     def get_form_items(self, form_info):
         items_list = []
+        image_url = None
         for item in form_info['items']:
-            question_id = item['questionItem']['question']['questionId']
-            title = item['title']
-            image_url = None
-            if 'image' in item['questionItem']:
-                image_url = item['questionItem']['image']['contentUri']
-            items_list.append({
-                'question_id': question_id,
-                'title': title,
-                'image_url': image_url
-            })
+            item_id = item['itemId']
+            if 'questionGroupItem' in item:
+                for question in item['questionGroupItem']['questions']:
+                    question_id = question['questionId']
+                    title = question['rowQuestion']['title']
+                    items_list.append({
+                        'item_id': item_id,
+                        'question_id': question_id,
+                        'title': title,
+                        'image_url': image_url,
+                    })
+            else:
+                question_id = item['questionItem']['question']['questionId']
+                title = item['title']
+                if 'image' in item['questionItem']:
+                    image_url = item['questionItem']['image']['contentUri']
+                items_list.append({
+                    'item_id': item_id,
+                    'question_id': question_id,
+                    'title': title,
+                    'image_url': image_url
+                })
         return items_list
 
     def get_responses_list(self, form_responses, items_list):
         response_list = []
+
+        # Mapping question_id to item details for quick lookup
+        item_lookup = {item['question_id']: item for item in items_list}
+
         for resp in form_responses:
             response_dict = {
                 'response_id': resp['responseId'],
                 'create_time': resp['createTime'],
                 'last_submitted_time': resp['lastSubmittedTime'],
-                'answers': []
+                'answers': {}
             }
-            for key, value in resp['answers'].items():
-                question_id = key
-                title = None
-                image_url = None
-                for item in items_list:
-                    if item['question_id'] == question_id:
-                        title = item['title']
-                        if item['image_url']:
-                            image_url = item['image_url']
 
-                if 'fileUploadAnswers' in value:
-                    ans = value['fileUploadAnswers']['answers']
-                else:
-                    ans = value['textAnswers']['answers']
+            for question_id, value in resp['answers'].items():
+                item = item_lookup.get(question_id)
+                if item:
+                    title = item.get('title')
+                    item_id = item.get('item_id')
+                    image_url = item.get('image_url', None)
 
-                response_dict['answers'].append({
-                    'question_id': question_id,
-                    'title': title,
-                    'value': ans,
-                    'image': image_url,
-                })
+                    values = value.get('fileUploadAnswers', {}).get('answers',
+                                                                    value.get('textAnswers', {}).get('answers'))
+
+                    for val in values:
+                        if 'fileId' in val:
+                            val['file_url'] = f"https://drive.google.com/file/d/{val['fileId']}/view"
+
+                    if item_id in response_dict['answers']:
+                        response_dict['answers'][item_id].append({
+                            'question_id': question_id,
+                            'title': title,
+                            'value': values,
+                            'image': image_url,
+                        })
+                    else:
+                        response_dict['answers'][item_id] = [{
+                            'question_id': question_id,
+                            'title': title,
+                            'value': values,
+                            'image': image_url,
+                        }]
+
             response_list.append(response_dict)
+
         return response_list
 
     def get_form_details(self, request, form_id):
@@ -279,20 +306,20 @@ class GetGoogleFormsResponses(View):
 
     def make_string_from_object_list(self, data):
         result_strings = []
-        for item in data:
-            title = item['title']
-            value = item['value'][0].get('value', None)
-            # image = item['value'][0].get('image', None)
+        for key, items in data.items():
+            for item in items:
+                title = item['title']
+                value = item['value'][0].get('value', None)
 
-            if not value:
-                file_id = item['value'][0]['fileId']
-                file_name = item['value'][0]['fileId']
-                file_type = item['value'][0]['fileId']
-                result_strings.append(f"{file_type}: {file_name} has file_id {file_id}")
-            # elif image:
-            #     result_strings.append(f"{title}: {image}")
-            else:
-                result_strings.append(f"{title}: {value}")
+                if not value:
+                    file_id = item['value'][0]['fileId']
+                    file_name = item['value'][0]['fileName']
+                    file_type = item['value'][0]['mimeType']
+                    file_url = item['value'][0]['file_url']
+                    result_strings.append(
+                        f"{file_type}: {file_name} has file id and file url is as follows: {file_id}, {file_url}")
+                else:
+                    result_strings.append(f"{title}: {value}")
         final_string = "\n".join(result_strings)
         return final_string
 
